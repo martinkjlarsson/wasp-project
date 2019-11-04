@@ -2,8 +2,9 @@ function [s,w,wprime] = solveImuArray(ya,yg,r,sa,sg)
 % SOLVEIMUARRAY Find the translation and rotation forces of an IMU array.
 %   [s,w,wprime] = solveImuArray(ya,yg,r,sa,sg) finds the common specific
 %       forces s, the angular velocity w and the angular acceleration
-%       wprime of and IMU array. The array must contain at least three
-%       accelerometers and one gyroscope.
+%       wprime of an IMU array. The array must contain at least three
+%       accelerometers. If there are N solutions to the problem the outputs
+%       become 3 by N matrices.
 %
 %       Inputs:
 %           ya - 3 by Na matrix of accelerometer measurements.
@@ -24,7 +25,6 @@ function [s,w,wprime] = solveImuArray(ya,yg,r,sa,sg)
     Ng = length(yg)/3;
 
     assert(Na >= 3,'There has to be at least three accelerometers.');
-    assert(Ng > 0,'There has to be at least one gyroscope.');
     assert(isequal(size(r),[3 Na]),'The size of r is inconsitent with ya. Expected a size of [3 %d].',Na);
 
     % Create problem matrices.
@@ -55,51 +55,38 @@ function [s,w,wprime] = solveImuArray(ya,yg,r,sa,sg)
     indsZ1 = [1;10;11;19;20;21;28;29;30;31;37;38;39;40;41;46;47;48;49;50;51;81];
     wsols = solver_inertial_array([Z1(indsZ1); Z2]);
     
-    bestLikelihood = -inf;
-    bestInd = 0;
-    
-    % Find best solution.
+    % Remove missing and complex solutions.
+    w = zeros(3,size(wsols,2));
+    keep = false(1,size(wsols,2));
     for i=1:size(wsols,2)
-        if ~isreal(wsols(:,i))
+        wsol = wsols(:,i);
+        
+        if ~all(isfinite(wsol))
+            continue;
+        end
+
+        if any(abs(imag(wsol)./real(wsol)) > 1e-6)
             continue;
         end
         
-        wx = wsols(1,i);
-        wy = wsols(2,i);
-        wz = wsols(3,i);
-
-        m = [wx^2; wx*wy; wx*wz; wy^2; wy*wz; wz^2; wx; wy; wz];
-        L = -0.5*(y-W*m)'*P*(y-W*m);
-        if L > bestLikelihood
-            bestLikelihood = L;
-            bestInd = i;
-        end
+        w(:,i) = real(wsol);
+        keep(i) = 1;
     end
+    w = w(:,keep);
     
-    if bestInd == 0
-        s = nan;
-        w = nan;
-        wprime = nan;
-    else
-        w = wsols(:,bestInd);
-        
-        % Refine solution.
-%         wx = w(1);
-%         wy = w(2);
-%         wz = w(3);
-%         m = [wx^2; wx*wy; wx*wz; wy^2; wy*wz; wz^2; wx; wy; wz];
-%         mprime = [2*wx 0 0; wy wx 0; wz 0 wx; 0 2*wy 0; 0 wz wy; 0 0 2*wz; 1 0 0; 0 1 0; 0 0 1];
-%         Jh = W*mprime;
-%         w = w+(Jh'*P*Jh)\Jh'*P*(y-W*m);
-        
-        % Solve linearly for s and wprime.
-        wx = w(1);
-        wy = w(2);
-        wz = w(3);
-        m = [wx^2; wx*wy; wx*wz; wy^2; wy*wz; wz^2; wx; wy; wz];
-        swprime = HQ*(ya-Wa*m);
-        s = swprime(4:6);
-        wprime = swprime(1:3);
-    end
+    wx = w(1,:);
+    wy = w(2,:);
+    wz = w(3,:);
+    m = [wx.^2; wx.*wy; wx.*wz; wy.^2; wy.*wz; wz.^2; wx; wy; wz];
+    
+    % Sort solutions based on likelihood.
+    L = -0.5*dot((y-W*m),P*(y-W*m));
+    [~,sind] = sort(L,'descend');
+    w = w(:,sind);
+    
+    % Solve linearly for s and wprime.
+    swprime = HQ*(ya-Wa*m);
+    s = swprime(4:6,:);
+    wprime = swprime(1:3,:);
 end
 

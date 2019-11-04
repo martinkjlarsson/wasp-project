@@ -3,8 +3,8 @@
 %% Initialization.
 Na = 3;
 Ng = 1;
-sigmaa = 1e-3;
-sigmag = 1e-3;
+sigmaa = 1e-6;
+sigmag = 1e-6;
 
 iters = 1000;
 
@@ -34,16 +34,22 @@ for k=1:iters
     y = [ya; yg];
 
     [s,w,wprime] = solveImuArray(ya,yg,r,sigmaa,sigmag);
-    ress(k) = norm(s-sgt);
-    resw(k) = norm(w-wgt);
-    reswprim(k) = norm(wprime-wprimegt);
+    
+    % Pick most likely solution.
+%     s = s(:,1);
+%     w = w(:,1);
+%     wprime = wprime(:,1);
+
+    ress(k) = min(vecnorm((s-sgt)));
+    resw(k) = min(vecnorm((w-wgt)));
+    reswprim(k) = min(vecnorm(wprime-wprimegt));
 
     [s,w,wprime] = solveImuArrayMl(ya,yg,r,sigmaa,sigmag,wgt);
     reswml(k) = norm(w-wgt);
 end
 
 %% Plot residual distributions.
-edges = -20:0.25:0;
+edges = -20:0.25:5;
 centers = edges(1:end-1)+diff(edges)/2;
 hcs = histcounts(log10(ress),edges)/iters;
 hcw = histcounts(log10(resw),edges)/iters;

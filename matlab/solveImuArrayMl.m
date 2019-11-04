@@ -2,7 +2,7 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
 % SOLVEIMUARRAYML Find the translation and rotation forces of an IMU array.
 %   [s,w,wprime] = solveImuArray(ya,yg,r,sa,sg) finds the common specific
 %       forces s, the angular velocity w and the angular acceleration
-%       wprime of and IMU array. The array must contain at least three
+%       wprime of an IMU array. The array must contain at least three
 %       accelerometers and one gyroscope.
 %
 %       Inputs:
@@ -24,7 +24,7 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
     Ng = length(yg)/3;
 
     assert(Na >= 3,'There has to be at least three accelerometers.');
-    assert(Ng > 0,'There has to be at least one gyroscope.');
+%     assert(Ng > 0,'There has to be at least one gyroscope.');
     assert(isequal(size(r),[3 Na]),'The size of r is inconsitent with ya. Expected a size of [3 %d].',Na);
 
     % Create problem matrices.
@@ -43,7 +43,7 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
     E([5 9 11 13 21 25 28 36 42 44 46 50]) = [-1 -1 1 1 1 1 -1 -1 1 1 -1 -1];
     Wa = kron(r',eye(3))*E;
     Wg = [zeros(3*Ng,6) repmat(eye(3),Ng,1)];
-    W = [Wa; Wg]; % h(w) = W*m)
+    W = [Wa; Wg]; % h(w) = W*m
 
     w = w0;
     maxIters = 10;
