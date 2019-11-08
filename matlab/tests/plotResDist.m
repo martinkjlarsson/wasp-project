@@ -32,13 +32,11 @@ for k=1:iters
     [~,w,~] = solveImuArray(ya,yg,r,sigmaa,sigmag);
     
     % Pick most likely solution.
-    s = s(:,1);
-    w = w(:,1);
-    wprime = wprime(:,1);
+%     w = w(:,1);
 
     resw(k) = min(vecnorm((w-wgt)));
 
-    [~,w,~] = solveImuArrayMl(ya,yg,r,sigmaa,sigmag,randn(3,1));
+    [~,w,~] = solveImuArrayMl(ya,yg,r,sigmaa,sigmag,wgt);
     reswml(k) = min(vecnorm((w-wgt)));
 end
 
