@@ -2,8 +2,7 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
 % SOLVEIMUARRAYML Find the translation and rotation forces of an IMU array.
 %   [s,w,wprime] = solveImuArray(ya,yg,r,sa,sg) finds the common specific
 %       forces s, the angular velocity w and the angular acceleration
-%       wprime of an IMU array. The array must contain at least three
-%       accelerometers and one gyroscope.
+%       wprime of an IMU array.
 %
 %       Inputs:
 %           ya - 3 by Na matrix of accelerometer measurements.
@@ -24,7 +23,6 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
     Ng = length(yg)/3;
 
     assert(Na >= 3,'There has to be at least three accelerometers.');
-%     assert(Ng > 0,'There has to be at least one gyroscope.');
     assert(isequal(size(r),[3 Na]),'The size of r is inconsitent with ya. Expected a size of [3 %d].',Na);
 
     % Create problem matrices.
@@ -46,7 +44,7 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
     W = [Wa; Wg]; % h(w) = W*m
 
     w = w0;
-    maxIters = 10;
+    maxIters = 100;
     
     for i=1:maxIters
         wx = w(1);
@@ -54,15 +52,21 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
         wz = w(3);
         m = [wx^2; wx*wy; wx*wz; wy^2; wy*wz; wz^2; wx; wy; wz];
         mprime = [2*wx 0 0; wy wx 0; wz 0 wx; 0 2*wy 0; 0 wz wy; 0 0 2*wz; 1 0 0; 0 1 0; 0 0 1];
+        
+        % Calculate Jacobian and residual.
         Jh = W*mprime;
-        w = w+(Jh'*P*Jh)\(Jh'*P*(y-W*m));
+        res = Jh'*P*(y-W*m);
         
-        % TODO: Add exit condition.
+%         fprintf('Iteration: %d, residual norm: %e\n',i,norm(res));
+        if norm(res) < 1e-6
+            break;
+        end
         
-%         L = -0.5*(y-W*m)'*P*(y-W*m);
-%         fprintf('Iteration: %d, residual norm: %e, log-likelihood: %e\n',i,norm(y-W*m),L);
+        % Gauss-Newton step.
+        w = w+(Jh'*P*Jh)\res;
     end
     
+    % Solve linearly for s and wprime.
     wx = w(1);
     wy = w(2);
     wz = w(3);
