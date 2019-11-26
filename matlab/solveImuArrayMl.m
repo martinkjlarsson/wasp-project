@@ -28,8 +28,8 @@ function [s,w,wprime] = solveImuArrayMl(ya,yg,r,sa,sg,w0)
     % Create problem matrices.
     Ha = [-skewSymmetric(r) repmat(eye(3),Na,1)];
 
-    Qai = (1/sa)*eye(3*Na);
-    Qgi = (1/sg)*eye(3*Ng);
+    Qai = (1/sa^2)*eye(3*Na);
+    Qgi = (1/sg^2)*eye(3*Ng);
 
     HQ = (Ha'*Qai*Ha)\Ha'*Qai;
     Pa = Qai-Qai*Ha*HQ;
