@@ -3,10 +3,10 @@
 %% Initialization.
 Na = 4;
 Ng = Na;
-% sigmaa = 0;
-% sigmag = 0;
-sigmaa = 1e-6;
-sigmag = 1e-6;
+sigmaa = 0;
+sigmag = 0;
+% sigmaa = 1e-6;
+% sigmag = 1e-6;
 
 iters = 1000;
 
@@ -15,6 +15,7 @@ resq = inf(1,iters);
 %% Eval numerics.
 for k=1:iters
     r = rand(3,Na);
+%     r = [zeros(3,1) eye(3)];
 
     % Generate ground truth unkowns.
     sgt = rand(3,1);
@@ -44,7 +45,7 @@ for k=1:iters
     ya = bigR'*si(:);
     yg = bigR'*(repmat(wgt,Ng,1)+sigmag*randn(3*Ng,1));
 
-    [~,w,~,R,q] = solveImuArrayR(ya,yg,r,Rp);
+    [~,~,~,R,q] = solveImuArrayR(ya,yg,r,Rp);
 
     if ~isempty(q)
         resq(k) = min(vecnorm(([q -q]-qgt(:,1))));
