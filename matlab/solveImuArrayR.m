@@ -1,8 +1,16 @@
-function [s,w,wprime,R,q] = solveImuArrayR(ya,yg,r,Rp)
-% SOLVEIMUARRAYR Find the translation and rotation forces of an IMU array.
-% TODO: Documentation. Similar to SOLVEIMUARRAY but also solves for the
-% orientation of the IMUs provided their orientation relative to the first
-% IMU.
+function R = solveImuArrayR(ya,yg,r,Rp)
+% SOLVEIMUARRAYR Find rotation from a common frame to a global
+%   R = SOLVEIMUARRAYR(ya,yg,r,Rp)
+%       Inputs:
+%           ya - accelerometer measurements in local IMU frame
+%           yg - gyroscope measurements in local IMU frame
+%           r - 3 x N matrix of IMU positions in global frame
+%           Rp - cell array of rotation matrices that takes the
+%               measurements from their local frames to some common one.
+%       Outputs:
+%           R - cell array of rotation matrices that takes the measurements
+%               from the common frame to the global one. Each matrix is a
+%               possible solution to problem being solved.
 %
 % See also SOLVEIMUARRAY.
 
@@ -15,14 +23,12 @@ function [s,w,wprime,R,q] = solveImuArrayR(ya,yg,r,Rp)
     
     ya = reshape(ya,3,Na);
     yg = reshape(yg,3,Ng);
-
-    Ha = [-skewSymmetric(r) repmat(eye(3),Na,1)];
-
-    E = zeros(9,9);
-    E([5 9 11 13 21 25 28 36 42 44 46 50]) = [-1 -1 1 1 1 1 -1 -1 1 1 -1 -1];
-    Wa = kron(r',eye(3))*E;
-%     Wg = [zeros(3*Ng,6) repmat(eye(3),Ng,1)];
-%     W = [Wa; Wg]; % h(w) = W*m
+    
+    % Some configurations of r might result in bad numerics. This is just a
+    % quirk of the action matrix solvers. We mitigate this problem by
+    % applying a random rotation to r and revert the rotation at the end.
+    randRot = quat2dcm(randn(1,4));
+    r = randRot*r;
     
     % Transform measurements to the frame of the first IMU.
     za = zeros(3,Na);
@@ -33,17 +39,34 @@ function [s,w,wprime,R,q] = solveImuArrayR(ya,yg,r,Rp)
     for i=1:Ng
         zg(:,i) = Rp{i}*yg(:,i);
     end
+    mzg = mean(zg,2);
 
+    E = zeros(9,6);
+    E([5 9 11 13 21 25 28 36 42 44 46 50]) = [-1 -1 1 1 1 1 -1 -1 1 1 -1 -1];
+    Wa = kron(r',eye(3))*E;
     Va = kron(za',eye(3));
-%     Vg = kron(zg',eye(3));
-%     V = [Va; Vg];
+
+    Ha = [-skewSymmetric(r) repmat(eye(3),Na,1)];
+    P = eye(3*Na)-Ha*((Ha'*Ha)\Ha');
+    Z = P*[Va -Wa];
     
-    ASD = eye(3*Na)-Ha*((Ha'*Ha)\Ha');
-    Z = ASD*[Va -Wa];
-    Z = Z(1:3,1:15);
-    
-    % Solve polynomial system.
-    qsols = solver_inertial_array_R([Z(:); mean(zg,2)]);
+    % Why rows 1, 5 and 9? When Na == 3 the problem is not well-defined for
+    % any three equations. These happen to work. I have not investigated
+    % further.
+    Z = Z([1 5 9],:);
+
+    % Solve polynomial system. Although the equations are the same there
+    % are 32 solutions when Na == 3 and 48 solutions when Na >= 4. Because
+    % of this, two solvers has been created and they do not perform good
+    % numerically on each other's data, i.e., both are needed.
+    % Consider using MEX versions for significant speed improvement.
+    if Na == 3
+        qsols = solver_inertial_array_R_3([Z(:); mzg]);
+%         qsols = solver_inertial_array_R_3_mex([Z(:); mzg]);
+    else
+        qsols = solver_inertial_array_R([Z(:); mzg]);
+%         qsols = solver_inertial_array_R_mex([Z(:); mzg]);
+    end
     
     % Remove missing and complex solutions.
     q = zeros(4,size(qsols,2));
@@ -65,35 +88,10 @@ function [s,w,wprime,R,q] = solveImuArrayR(ya,yg,r,Rp)
     q = q(:,keep);
     q = q./vecnorm(q);
     
-    % Find w and transforms.
-    mq = zeros(9,size(q,2));
-    w = zeros(3,size(q,2));
-    R = cell(length(Rp),size(q,2));
+    % Calculate final rotation matrices by reverting the random rotation.
+    R = cell(1,size(q,2));
     for i=1:size(q,2)
-        R1 = quat2dcm(q(:,i)');
-        mq(:,i) = R1(:);
-        w(:,i) = R1*mean(zg,2);
-        for j=1:length(Rp)
-            R{j,i} = R1*Rp{j};
-        end
+        R{i} = randRot'*quat2dcm(q(:,i).');
     end
-    
-    wx = w(1,:);
-    wy = w(2,:);
-    wz = w(3,:);
-    mw = [wx.^2; wx.*wy; wx.*wz; wy.^2; wy.*wz; wz.^2; wx; wy; wz];
-    
-    % Sort solutions based on likelihood.
-%     L = -0.5*dot((V*mq-W*mw),P*(V*mq-W*mw));
-%     [~,sind] = sort(L,'descend');
-%     q  = q(:,sind);
-%     mq = mq(:,sind);
-%     w = w(:,sind);
-%     R = R(:,sind);
-    
-    % Solve linearly for s and wprime.
-    swprime = (Ha'*Ha)\Ha'*(Va*mq-Wa*mw);
-    s = swprime(4:6,:);
-    wprime = swprime(1:3,:);
 end
 

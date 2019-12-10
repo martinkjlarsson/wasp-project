@@ -9,9 +9,9 @@ function [s,w,wprime,R] = fullSystem(ya,yg,r,sa,sg)
     nSamples = 10;
 
     % Find pairwise rotations between IMUs.
-    % TODO: Maybe place this in the RANSAC loop and sample two (?) time
-    % steps and find the transforms that way. Should be more robust to
-    % outliers but maybe less so to noise.
+    % TODO: Maybe place this in the RANSAC loop and sample two time steps
+    % and find the transforms that way. Should be more robust to outliers
+    % but maybe less so to noise.
     Rp = cell(Ng,1);
     for i=1:Ng
         Rp{i} = wahba(squeeze(yg(:,i,:)),squeeze(yg(:,1,:)));
@@ -21,21 +21,26 @@ function [s,w,wprime,R] = fullSystem(ya,yg,r,sa,sg)
     bestSol = struct();
     bestSol.res = inf;
     for iSample=1:nSamples
-        % Random sample.
+        % Random minimal sample - 1 time step, 3 IMUs.
         t = randi(Nt);
-        ygt = yg(:,:,t);
-        yat = ya(:,:,t);
+        imu = randperm(Na,3);
+        ygt = yg(:,imu,t);
+        yat = ya(:,imu,t);
+        rt = r(:,imu);
+        Rpt = Rp(imu);
         
         % Solve sample.
-        [~,~,~,Rsols] = solveImuArrayR(yat,ygt,r,Rp);
-        % TODO: Maybe some solutions (local maxima) can be discarded
-        % directly to avoid solving for s, w, and wprime. Should make
-        % things faster.
+        R1 = solveImuArrayR(yat,ygt,rt,Rpt);
+        % TODO: Maybe some solutions can be discarded directly to avoid
+        % solving for s, w, and wprime. Should make things faster.
         
-        for iSol=1:size(Rsols,2)
-            R = Rsols(:,iSol);
+        for iSol=1:length(R1)
+            R = cell(length(Rp),1);
+            for j=1:length(Rp)
+                R{j} = R1{iSol}*Rp{j};
+            end
             
-            % Transform measurements.
+            % Transform measurements to global frame.
             za = zeros(size(ya));
             zg = zeros(size(yg));
             for ia=1:Na
@@ -76,7 +81,7 @@ function [s,w,wprime,R] = fullSystem(ya,yg,r,sa,sg)
     s = bestSol.s;
     w = bestSol.w;
     wprime = bestSol.wprime;
-    [s,w,wprime,R] = refineFullSystem(ya,yg,r,sa,sg,s,w,wprime,R);
+    [s,w,wprime,R] = refineFullSystem(ya,yg,r,sa,sg,s,w,wprime,R,10);
     
     res = fullSystemResidual(ya,yg,r,sa,sg,s,w,wprime,R);
     fprintf('Final residual: %f\n',res);

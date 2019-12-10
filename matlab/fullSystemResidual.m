@@ -3,7 +3,7 @@ function res = fullSystemResidual(ya,yg,r,sa,sg,s,w,wprime,R)
     Nt = size(ya,3);
     Na = size(ya,2);
 
-    % Transform measurements.
+    % Transform measurements to global frame.
     za = zeros(size(ya));
     zg = zeros(size(yg));
     for ia=1:Na
@@ -11,7 +11,7 @@ function res = fullSystemResidual(ya,yg,r,sa,sg,s,w,wprime,R)
         zg(:,ia,:) = R{ia}*squeeze(yg(:,ia,:));
     end
     
-    % Evaluate sample.
+    % Caclulate residual.
     resa = zeros(1,Nt);
     resg = zeros(1,Nt);
     for it=1:Nt

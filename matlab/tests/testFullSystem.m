@@ -2,13 +2,19 @@
 
 %% Initialization.
 Nt = 10;
-Na = 4;
-Ng = 4;
+Na = 3;
+Ng = Na;
 sigmaa = 1e-6;
 sigmag = 1e-6;
 
 %% Create data.
 r = rand(3,Na);
+% Some difficult configurations of r. Will no longer cause bad numerics.
+% r = [zeros(3,1) eye(3)];
+% r = eye(3);
+% r = [0 0 0; 0 1 0; 0 0 1];
+% theta = [-pi/3 pi/2 -2*pi/3];
+% r = [cos(theta); sin(theta); zeros(1,3)];
 
 % Generate ground truth unkowns.
 sgt = rand(3,Nt);

@@ -1,5 +1,8 @@
 function [s,w,wprime,R] = refineFullSystem(ya,yg,r,sa,sg,s,w,wprime,R,maxIters)
-% REFINEFULLSYSTEM Refine a solution from fullSystem
+% REFINEFULLSYSTEM Refine a solution from fullSystem.
+%   [s,w,wprime,R] = refineFullSystem(ya,yg,r,sa,sg,s,w,wprime,R,maxIters)
+%       refines a solution found by fullSystem using coordinate descent on
+%       the rotation matrices R and the forces s, w and wprime.
 %
 % See also fullSystem.
 
@@ -58,11 +61,14 @@ function [s,w,wprime,R] = refineFullSystem(ya,yg,r,sa,sg,s,w,wprime,R,maxIters)
         w = zeros(3,Nt);
         wprime = zeros(3,Nt);
         for it=1:Nt
+            % Since we have gyroscope measurements we have no problem
+            % initializing the iterative ML-solver and it is therefore
+            % probably a better choice.
             [s(:,it),w(:,it),wprime(:,it)] = solveImuArrayMl(za(:,:,it),zg(:,:,it),r,sa,sg,w0(:,it));
 %             [s(:,it),w(:,it),wprime(:,it)] = solveImuArray(za(:,:,it),zg(:,:,it),r,sa,sg);
         end
         
-        % Evaluate sample.
+        % Caclculate residual.
         resa = zeros(1,Nt);
         resg = zeros(1,Nt);
         for it=1:Nt
